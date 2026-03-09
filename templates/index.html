@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 手写数字识别</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 30px;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 700px;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        #drawingCanvas {
+            border: 3px solid #2c3e50;
+            border-radius: 12px;
+            cursor: crosshair;
+            background: #000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        #drawingCanvas:hover {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        #clearButton {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            color: white;
+        }
+        
+        #clearButton:hover {
+            background: linear-gradient(135deg, #ff5252 0%, #d63030 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 107, 107, 0.3);
+        }
+        
+        #predictButton {
+            background: linear-gradient(135deg, #4ecdc4 0%, #3db8b8 100%);
+            color: white;
+        }
+        
+        #predictButton:hover {
+            background: linear-gradient(135deg, #3db8b8 0%, #2d9a7a 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(78, 205, 196, 0.3);
+        }
+        
+        #predictButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            border-left: 5px solid #4ecdc4;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .result h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        #resultDigit {
+            font-size: 72px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 15px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        #resultConfidence {
+            color: #6c757d;
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4 0%, #3db8b8 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+        
+        .info {
+            margin-top: 25px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px 24px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4ecdc4;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-digit {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        .stat-prob {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 25px;
+            }
+            
+            #drawingCanvas {
+                max-width: 100%;
+                height: auto;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 AI 手写数字识别</h1>
+    <div class="subtitle">基于深度学习的智能识别系统</div>
+    
+    <div class="container">
+        <div class="canvas-wrapper">
+            <canvas id="drawingCanvas" width="320" height="320"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="clearButton">🗑️ 清除画布</button>
+            <button id="predictButton">🔍 开始识别</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div>正在识别中...</div>
+        </div>
+        
+        <div class="result" id="result">
+            <h3>📊 识别结果</h3>
+            <div id="resultDigit">?</div>
+            <div id="resultConfidence">在画布上用鼠标手写数字，然后点击"开始识别"</div>
+            <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+        </div>
+        
+        <div class="stats" id="stats" style="display: none;">
+        </div>
+    </div>
+    
+    <div class="info">
+        💡 提示：在黑色画布上用鼠标手写白色数字，然后点击"开始识别"按钮
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const clearButton = document.getElementById('clearButton');
+        const predictButton = document.getElementById('predictButton');
+        const resultDigit = document.getElementById('resultDigit');
+        const resultConfidence = document.getElementById('resultConfidence');
+        const loading = document.getElementById('loading');
+        const confidenceFill = document.getElementById('confidenceFill');
+        const stats = document.getElementById('stats');
+        
+        // 画布设置 - 黑底白字（与MNIST一致）
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 18;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        // 鼠标事件
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+        
+        canvas.addEventListener('mouseout', () => {
+            isDrawing = false;
+        });
+        
+        // 触摸事件（移动端支持）
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            isDrawing = true;
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            lastX = x;
+            lastY = y;
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+        });
+        
+        // 清除画布
+        clearButton.addEventListener('click', () => {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            resultDigit.textContent = '?';
+            resultConfidence.textContent = '在画布上用鼠标手写数字，然后点击"开始识别"';
+            confidenceFill.style.width = '0%';
+            stats.style.display = 'none';
+        });
+        
+        // 识别按钮
+        predictButton.addEventListener('click', async () => {
+            try {
+                // 显示加载状态
+                loading.classList.add('active');
+                predictButton.disabled = true;
+                
+                // 转换画布为 base64 图像
+                const dataURL = canvas.toDataURL('image/png');
+                
+                // 发送请求到后端
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: dataURL })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('网络错误');
+                }
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                // 显示结果
+                resultDigit.textContent = result.digit;
+                const confidencePercent = (result.confidence * 100).toFixed(2);
+                resultConfidence.textContent = `置信度: ${confidencePercent}%`;
+                confidenceFill.style.width = `${confidencePercent}%`;
+                
+                // 显示所有数字的概率
+                if (result.all_probabilities) {
+                    displayStats(result.all_probabilities);
+                }
+                
+            } catch (error) {
+                alert('识别失败: ' + error.message);
+                console.error(error);
+            } finally {
+                // 隐藏加载状态
+                loading.classList.remove('active');
+                predictButton.disabled = false;
+            }
+        });
+        
+        // 显示统计信息
+        function displayStats(probabilities) {
+            stats.innerHTML = '';
+            stats.style.display = 'grid';
+            
+            probabilities.forEach((prob, index) => {
+                const statItem = document.createElement('div');
+                statItem.className = 'stat-item';
+                statItem.innerHTML = `
+                    <div class="stat-digit">${index}</div>
+                    <div class="stat-prob">${(prob * 100).toFixed(1)}%</div>
+                `;
+                stats.appendChild(statItem);
+            });
+        }
+    </script>
+</body>
+</html>
