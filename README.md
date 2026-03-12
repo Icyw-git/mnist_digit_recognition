@@ -401,7 +401,7 @@ tqdm~=4.66.0
 
 - 项目主页：[GitHub Repository](https://github.com/yourusername/mnist_digit_recognition)
 - 问题反馈：[Issues](https://github.com/yourusername/mnist_digit_recognition/issues)
-- 邮箱：your.email@example.com
+
 
 ## 更新日志
 
